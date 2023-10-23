@@ -18,11 +18,10 @@ def reload_module(path):
 def enter_or_quit():
     wait = input("press any key to continue, q to quit.")
     received = wait.rstrip()
-    if received == 'q':
-        print("Bye.")
-        sys.exit(0)
-    else:
+    if received != 'q':
         return received
+    print("Bye.")
+    sys.exit(0)
 
 
 ALLOWED_RUNTIME_ERRORS = (
@@ -50,7 +49,7 @@ def reload_run_retry(module_path, callback):
             module = reload_module(module_path)
         except ALLOWED_IMPORT_ERRORS as e:
             print("issue reading %r, please fix." % (module_path,))
-            print(str(e))
+            print(e)
             traceback.print_exc(file=sys.stdout)
             enter_or_quit()
             continue
@@ -58,7 +57,7 @@ def reload_run_retry(module_path, callback):
             result = callback(module)
         except ALLOWED_RUNTIME_ERRORS as e:
             print("issue running %r, please fix." % (module_path,))
-            print(str(e))
+            print(e)
             traceback.print_exc(file=sys.stdout)
             enter_or_quit()
             continue

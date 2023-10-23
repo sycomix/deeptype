@@ -66,7 +66,7 @@ IS_KINSHIP = None
 IS_EPISODE_LIST = None
 
 def wkp(c, name):
-    return c.article2id['enwiki/' + name][0][0]
+    return c.article2id[f'enwiki/{name}'][0][0]
 
 def wkd(c, name):
     return c.name2index[name]
@@ -227,10 +227,7 @@ def get_relation_data(collection, relation_paths):
         promote = path.get("promote", False)
         numpy_path = []
         for step in path["steps"]:
-            if isinstance(step, str):
-                step_name, max_usage = step, 1
-            else:
-                step_name, max_usage = step
+            step_name, max_usage = (step, 1) if isinstance(step, str) else step
             relation = collection.relation(step_name)
             numpy_path.append((relation.offsets, relation.values, max_usage))
         inv_relation = collection.get_inverted_relation(step_name).edges() > 0
@@ -394,7 +391,7 @@ def fix(collection,
         IS_COUNTRY,
         IS_POLITICAL_ORGANIZATION
     ]
-    for i, alternative in enumerate(is_country_or_cardinal):
+    for alternative in is_country_or_cardinal:
         unchanged = values == new_values
         should_replace_by_country = logical_and(
             should_replace_by_country, unchanged

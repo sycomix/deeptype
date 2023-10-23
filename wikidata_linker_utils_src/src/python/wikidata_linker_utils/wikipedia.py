@@ -43,7 +43,7 @@ def iterate_articles(path):
 
 
 def induce_wikipedia_prefix(wikiname):
-    if wikiname in {code + "wiki" for code in LANGUAGE_CODES}:
+    if wikiname in {f"{code}wiki" for code in LANGUAGE_CODES}:
         return wikiname
     else:
         raise ValueError("Could not determine prefix for wiki "
@@ -136,10 +136,7 @@ def transition_trie_index(anchor_idx, dest_index, transitions, all_options):
     """
     option_transitions = transitions[anchor_idx]
     dest_index = option_transitions[option_transitions[:, 0] == dest_index, 1]
-    if len(dest_index) == 0:
-        dest_index = -1
-    else:
-        dest_index = np.asscalar(dest_index)
+    dest_index = -1 if len(dest_index) == 0 else np.asscalar(dest_index)
     if dest_index != -1:
         if not np.any(all_options == dest_index):
             dest_index = -1

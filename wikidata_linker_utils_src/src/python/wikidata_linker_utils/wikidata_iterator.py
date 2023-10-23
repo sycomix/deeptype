@@ -9,14 +9,14 @@ def iterate_bytes_jsons(fin, batch_size=1000):
         if l.startswith(b'{'):
             current.append(l)
         if len(current) >= batch_size:
-            docs = json.loads('[' + b"".join(current).decode('utf-8').rstrip(',\n') + ']')
-            for doc in docs:
-                yield doc
+            yield from json.loads(
+                '[' + b"".join(current).decode('utf-8').rstrip(',\n') + ']'
+            )
             current = []
     if len(current) > 0:
-        docs = json.loads('[' + b"".join(current).decode('utf-8').rstrip(',\n') + ']')
-        for doc in docs:
-            yield doc
+        yield from json.loads(
+            '[' + b"".join(current).decode('utf-8').rstrip(',\n') + ']'
+        )
         current = []
 
 
@@ -26,37 +26,28 @@ def iterate_text_jsons(fin, batch_size=1000):
         if l.startswith('{'):
             current.append(l)
         if len(current) >= batch_size:
-            docs = json.loads('[' + "".join(current).rstrip(',\n') + ']')
-            for doc in docs:
-                yield doc
+            yield from json.loads('[' + "".join(current).rstrip(',\n') + ']')
             current = []
     if len(current) > 0:
-        docs = json.loads('[' + "".join(current).rstrip(',\n') + ']')
-        for doc in docs:
-            yield doc
+        yield from json.loads('[' + "".join(current).rstrip(',\n') + ']')
         current = []
 
 
 def iterate_message_packs(fin):
 
-    unpacker = msgpack.Unpacker(fin, encoding='utf-8', use_list=False)
-    for obj in unpacker:
-        yield obj
+    yield from msgpack.Unpacker(fin, encoding='utf-8', use_list=False)
 
 
 def open_wikidata_file(path, batch_size):
     if path.endswith('bz2'):
         with bz2.open(path, 'rb') as fin:
-            for obj in iterate_bytes_jsons(fin, batch_size):
-                yield obj
+            yield from iterate_bytes_jsons(fin, batch_size)
     elif path.endswith('json'):
         with open(path, 'rt') as fin:
-            for obj in iterate_text_jsons(fin, batch_size):
-                yield obj
+            yield from iterate_text_jsons(fin, batch_size)
     elif path.endswith('mp'):
         with open(path, 'rb') as fin:
-            for obj in iterate_message_packs(fin):
-                yield obj
+            yield from iterate_message_packs(fin)
     else:
         raise ValueError(
             "unknown extension for wikidata. "

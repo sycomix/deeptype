@@ -34,8 +34,7 @@ def count_examples(lines, comment, ignore_value, column_indices):
 
 
 def retokenize_example(x, y):
-    tokens = ciseau.tokenize(" ".join(w for w in x),
-                             normalize_ascii=False)
+    tokens = ciseau.tokenize(" ".join(x), normalize_ascii=False)
     out_y = []
     regular_cursor = 0
     tokens_length_total = 0
@@ -63,7 +62,7 @@ def convert_lines_to_examples(lines, comment, ignore_value,
     for line in lines:
         if len(line) == 0 or (comment is not None and line.startswith(comment)):
             if len(x) > 0:
-                if not all(row == empty_column for row in y):
+                if any(row != empty_column for row in y):
                     examples.append((x, y))
                 x = []
                 y = []
@@ -72,22 +71,21 @@ def convert_lines_to_examples(lines, comment, ignore_value,
             x.append(cols[x_column])
             if len(cols) == 1:
                 y.append(empty_column)
+            elif ignore_value is None:
+                y.append(
+                    tuple(
+                        cols[col_index] if col_index is not None else None
+                        for col_index in column_indices
+                    )
+                )
             else:
-                if ignore_value is not None:
-                    y.append(
-                        tuple(
-                            cols[col_index] if col_index is not None and cols[col_index] != ignore_value else None
-                            for col_index in column_indices
-                        )
+                y.append(
+                    tuple(
+                        cols[col_index] if col_index is not None and cols[col_index] != ignore_value else None
+                        for col_index in column_indices
                     )
-                else:
-                    y.append(
-                        tuple(
-                            cols[col_index] if col_index is not None else None
-                            for col_index in column_indices
-                        )
-                    )
-    if len(x) > 0 and not all(row == empty_column for row in y):
+                )
+    if len(x) > 0 and any(row != empty_column for row in y):
         examples.append((x, y))
     if retokenize:
         examples = [retokenize_example(x, y) for x, y in examples]
@@ -416,7 +414,13 @@ class H5Dataset(RandomizableDataset):
 
     def _build_examples(self, index):
         x = [x_chunk.split("\n") for x_chunk in self.handle[self.x_column][index:index + self.chunksize]]
-        y = [[[None for k in range(len(self.objective_names))] for j in range(len(x[i]))] for i in range(len(x))]
+        y = [
+            [
+                [None for _ in range(len(self.objective_names))]
+                for _ in range(len(x[i]))
+            ]
+            for i in range(len(x))
+        ]
         if not self.ignore_y:
             for handle_column, col_content in self.column2col_indices.items():
                 col_ids = [[self._classifications.name2index[name] if name != "" else None

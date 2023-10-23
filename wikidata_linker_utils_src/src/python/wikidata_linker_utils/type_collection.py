@@ -26,7 +26,7 @@ class CachedRelation(object):
 
 @lru_cache(maxsize=None)
 def get_name(wikidata_id):
-    res = requests.get("https://www.wikidata.org/wiki/" + wikidata_id)
+    res = requests.get(f"https://www.wikidata.org/wiki/{wikidata_id}")
     el = res.text.find('<title>')
     el_end = res.text.find('</title>')
     return res.text[el + len('<title>'):el_end]
@@ -86,7 +86,7 @@ class TypeCollection(object):
             if self.verbose:
                 print('load %r (%r)' % (name, self.wikidata_names2prop_names[name],))
             self._attributes[name] = SparseAttribute.load(
-                join(self.path, "wikidata_%s" % (name,))
+                join(self.path, f"wikidata_{name}")
             )
         return self._attributes[name]
 
@@ -111,8 +111,7 @@ class TypeCollection(object):
             if self.verbose:
                 print('load %r (%r)' % (name, self.wikidata_names2prop_names[name],))
             self._relations[name] = OffsetArray.load(
-                join(self.path, "wikidata_%s" % (name,)),
-                compress=True
+                join(self.path, f"wikidata_{name}"), compress=True
             )
         return self._relations[name]
 
@@ -145,21 +144,21 @@ class TypeCollection(object):
     def get_name(self, identifier):
         if identifier >= self.num_names_to_load and self._web_get_name:
             try:
-                return get_name(self.ids[identifier]) + " (" + self.ids[identifier] + ")"
+                return f"{get_name(self.ids[identifier])} ({self.ids[identifier]})"
             except requests.exceptions.ConnectionError:
                 self._web_get_name = False
         name = self.known_names.get(identifier, None)
         if name is None:
             return self.ids[identifier]
         else:
-            return name + " (" + self.ids[identifier] + ")"
+            return f"{name} ({self.ids[identifier]})"
 
     def describe_connection(self, source, destination, allowed_edges):
         if isinstance(source, str):
             if source in self.name2index:
                 source_index = self.name2index[source]
             else:
-                source_index = self.article2id["enwiki/" + source][0][0]
+                source_index = self.article2id[f"enwiki/{source}"][0][0]
         else:
             source_index = source
 
@@ -167,7 +166,7 @@ class TypeCollection(object):
             if destination in self.name2index:
                 dest_index = self.name2index[destination]
             else:
-                dest_index = self.article2id["enwiki/" + destination][0][0]
+                dest_index = self.article2id[f"enwiki/{destination}"][0][0]
         else:
             dest_index = destination
 
@@ -180,7 +179,7 @@ class TypeCollection(object):
             _, path = found_path
             for el in path:
                 if isinstance(el, str):
-                    print("    " + el)
+                    print(f"    {el}")
                 else:
                     print(self.get_name(el), el)
         else:
@@ -192,11 +191,7 @@ class TypeCollection(object):
         if visited is None:
             visited = set()
 
-        if path is None:
-            path = [root]
-        else:
-            path = path + [root]
-
+        path = [root] if path is None else path + [root]
         for field in fields:
             field_parents = self.relation(field)[root]
             for el in field_parents:
@@ -215,8 +210,12 @@ class TypeCollection(object):
         if relation_name.endswith(".inv"):
             return self.relation(relation_name[:-4])
         if relation_name not in self._inverted_relations:
-            new_values_path = join(self.path, "wikidata_inverted_%s_values.npy" % (relation_name,))
-            new_offsets_path = join(self.path, "wikidata_inverted_%s_offsets.npy" % (relation_name,))
+            new_values_path = join(
+                self.path, f"wikidata_inverted_{relation_name}_values.npy"
+            )
+            new_offsets_path = join(
+                self.path, f"wikidata_inverted_{relation_name}_offsets.npy"
+            )
 
             if not exists(new_values_path):
                 relation = self.relation(relation_name)
@@ -231,8 +230,8 @@ class TypeCollection(object):
             if self.verbose:
                 print("load inverted %r (%r)" % (relation_name, self.wikidata_names2prop_names[relation_name]))
             self._inverted_relations[relation_name] = OffsetArray.load(
-                join(self.path, "wikidata_inverted_%s" % (relation_name,)),
-                compress=True
+                join(self.path, f"wikidata_inverted_{relation_name}"),
+                compress=True,
             )
         return self._inverted_relations[relation_name]
 
@@ -293,7 +292,7 @@ class TypeCollection(object):
 
     def print_top_class_members(self, truth_table, name="Other", topn=20):
         if self._weighted_articles is not None:
-            print("%s category, highly linked articles in wikipedia:" % (name,))
+            print(f"{name} category, highly linked articles in wikipedia:")
             sort_weight = self._weighted_articles * truth_table
             linked_articles = int((sort_weight > 0).sum())
             print("%s category, %d articles linked in wikipedia:" % (name, linked_articles))
@@ -302,13 +301,13 @@ class TypeCollection(object):
                 if not truth_table[art]:
                     break
                 print("%r (%d)" % (self.get_name(art), self._weighted_articles[art]))
-            print("")
         else:
-            print("%s category, sample of members:" % (name,))
+            print(f"{name} category, sample of members:")
             top_articles = np.where(truth_table)[0]
             for art in top_articles[:topn]:
                 print("%r" % (self.get_name(art),))
-            print("")
+
+        print("")
 
     def class_report(self, relation_names, truth_table, name="Other", topn=20):
         active_nodes = np.where(truth_table)[0].astype(np.int32)
@@ -330,14 +329,12 @@ class TypeCollection(object):
 
         is_fp = np.logical_and(
             np.logical_or(
-                self.relation(wprop.FIXED_POINTS + ".inv").edges() > 0,
-                self.relation(wprop.FIXED_POINTS).edges() > 0
+                self.relation(f"{wprop.FIXED_POINTS}.inv").edges() > 0,
+                self.relation(wprop.FIXED_POINTS).edges() > 0,
             ),
-            truth_table
+            truth_table,
         )
-        self.print_top_class_members(
-            is_fp, topn=topn, name=name + " (fixed points)"
-        )
+        self.print_top_class_members(is_fp, topn=topn, name=f"{name} (fixed points)")
         if self._weighted_articles is not None:
             self.print_top_class_members(truth_table, topn=topn, name=name)
 
@@ -352,7 +349,7 @@ class TypeCollection(object):
                 ))
                 continue
             filtered_bad_node.append(el)
-        bad_node = set(self.name2index[el] for el in filtered_bad_node)
+        bad_node = {self.name2index[el] for el in filtered_bad_node}
 
         filtered_bad_node_pair = []
 
@@ -368,6 +365,8 @@ class TypeCollection(object):
                 ))
                 continue
             filtered_bad_node_pair.append((el, oel))
-        bad_node_pair = set([(self.name2index[el], self.name2index[oel])
-                             for el, oel in filtered_bad_node_pair])
+        bad_node_pair = {
+            (self.name2index[el], self.name2index[oel])
+            for el, oel in filtered_bad_node_pair
+        }
         self.set_bad_node(bad_node, bad_node_pair)

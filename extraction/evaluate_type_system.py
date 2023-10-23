@@ -32,8 +32,7 @@ def maybe_web_get_name(s):
     global INTERNET
     if INTERNET:
         try:
-            res = web_get_name(s)
-            return res
+            return web_get_name(s)
         except requests.exceptions.ConnectionError:
             INTERNET = False
     return s
@@ -234,8 +233,8 @@ def obtain_tags(doc,
 
 
 def add_boolean(parser, name, default):
-    parser.add_argument("--%s" % (name,), action="store_true", default=default)
-    parser.add_argument("--no%s" % (name,), action="store_false", dest=name)
+    parser.add_argument(f"--{name}", action="store_true", default=default)
+    parser.add_argument(f"--no{name}", action="store_false", dest=name)
 
 
 def get_parser():
@@ -285,9 +284,9 @@ def summarize_ambiguities(ambiguous_tags,
                           get_name):
     class_ambiguities = {}
     for anchor, dest, other_dest, times_pointed in ambiguous_tags:
-        class_ambig_name = []
-        for oracle in oracles:
-            class_ambig_name.append(oracle.classes[oracle.classify(dest)])
+        class_ambig_name = [
+            oracle.classes[oracle.classify(dest)] for oracle in oracles
+        ]
         class_ambig_name = " and ".join(class_ambig_name)
         if class_ambig_name not in class_ambiguities:
             class_ambiguities[class_ambig_name] = {
@@ -299,7 +298,7 @@ def summarize_ambiguities(ambiguous_tags,
             class_ambiguities[class_ambig_name]["examples"].append((anchor, dest, other_dest, times_pointed))
     print("Ambiguity Report:")
     for classname, ambiguity in sorted(class_ambiguities.items(), key=lambda x: x[0]):
-        print("    %s" % (classname,))
+        print(f"    {classname}")
         print("        %d ambiguities" % (ambiguity["count"],))
 
         common_bad_anchors = Counter([anc for anc, _, _, _ in ambiguity["examples"]]).most_common(6)
@@ -351,9 +350,9 @@ def fix_and_parse_tags(config, collection, size):
     while True:
         try:
             collection.load_blacklist(join(SCRIPT_DIR, "blacklist.json"))
-        except (ValueError,) as e:
+        except ValueError as e:
             print("issue reading blacklist, please fix.")
-            print(str(e))
+            print(e)
             enter_or_quit()
             continue
         break
@@ -421,11 +420,11 @@ def main():
     def get_name(idx):
         if idx < config.num_names_to_load:
             if idx in collection.known_names:
-                return collection.known_names[idx] + " (%s)" % (collection.ids[idx],)
+                return f"{collection.known_names[idx]} ({collection.ids[idx]})"
             else:
                 return collection.ids[idx]
         else:
-            return maybe_web_get_name(collection.ids[idx]) + " (%s)" % (collection.ids[idx],)
+            return f"{maybe_web_get_name(collection.ids[idx])} ({collection.ids[idx]})"
 
     while True:
         total_report, ambiguous_tags = disambiguate_batch(

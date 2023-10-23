@@ -98,8 +98,8 @@ def feature_npdtype(feat):
 
 
 def get_vocabs(dataset, max_vocabs, extra_words=None):
-    index2words = [[] for i in range(len(max_vocabs))]
-    occurrences = [{} for i in range(len(max_vocabs))]
+    index2words = [[] for _ in range(len(max_vocabs))]
+    occurrences = [{} for _ in range(len(max_vocabs))]
     for els in dataset:
         for el, index2word, occurrence in zip(els, index2words, occurrences):
             if el not in occurrence:
@@ -139,10 +139,8 @@ def get_feature_vocabs(features, dataset, extra_words=None):
                     feats_with_vocabs.append(index2word)
                 else:
                     feats_needing_vocab.append(feat)
-        if len(feats_needing_vocab) > 0:
-            extractors = tuple(
-                [extract_feat(feat) for feat in feats_needing_vocab]
-            )
+        if feats_needing_vocab:
+            extractors = tuple(extract_feat(feat) for feat in feats_needing_vocab)
             vocabs = get_vocabs(
                 ((extractor(w) for extractor in extractors)
                  for x, _ in dataset for w in x),
@@ -178,8 +176,7 @@ def pad_arrays_into_array(arrays, padding):
     out.fill(padding)
     for arr_idx, array in enumerate(arrays):
         arr_slice = [arr_idx]
-        for dim_idx in range(arr.ndim):
-            arr_slice.append(slice(0, array.shape[dim_idx]))
+        arr_slice.extend(slice(0, array.shape[dim_idx]) for dim_idx in range(arr.ndim))
         arr_slice = tuple(arr_slice)
         out[arr_slice] = array
     return out
@@ -227,9 +224,7 @@ def allocate_shrunk_batches(max_length, batch_size, lengths):
 def convert_label_to_index(label, label2index):
     if label is None:
         return 0
-    if isinstance(label, str):
-        return label2index[label]
-    return label
+    return label2index[label] if isinstance(label, str) else label
 
 
 class Batchifier(object):
@@ -276,11 +271,12 @@ class Batchifier(object):
                 batch_size=self.batch_size,
                 lengths=[len(dataset[indices[i]][0]) for i in range(len(indices))]
             )
-            for i, j in ranges:
-                self.batch_indices.append(indices[i:j])
+            self.batch_indices.extend(indices[i:j] for i, j in ranges)
         else:
-            for i in range(0, len(indices), self.batch_size):
-                self.batch_indices.append(indices[i:i + self.batch_size])
+            self.batch_indices.extend(
+                indices[i : i + self.batch_size]
+                for i in range(0, len(indices), self.batch_size)
+            )
         self.extractors = [
             (extract_feat(feat), requires_vocab(feat), feature_npdtype(feat),
              extract_word_keep_prob(feat), extract_case_keep_prob(feat), extract_s_keep_prob(feat))
@@ -288,7 +284,7 @@ class Batchifier(object):
         ]
 
     def generate_batch(self, examples):
-        X = [[] for i in range(len(self.extractors))]
+        X = [[] for _ in range(len(self.extractors))]
         Y = []
         Y_mask = []
         for ex, label in examples:
@@ -440,7 +436,7 @@ def batch_worker(rng,
 
 
 def range_size(start, size):
-    return [i for i in range(start, start + size)]
+    return list(range(start, start + size))
 
 
 class ProcessHolder(object):
@@ -493,10 +489,7 @@ def iter_batches_single_threaded(model,
          dataset=dataset
     )
     for batch in prefetch_generator(batchifier.iter_batches(pbar=pbar), to_fetch=100):
-        feed_dict = {}
-        for idx, key in enumerate(tensorflow_placeholders):
-            feed_dict[key] = batch[idx]
-        yield feed_dict
+        yield {key: batch[idx] for idx, key in enumerate(tensorflow_placeholders)}
 
 
 def iter_batches(model,
@@ -544,8 +537,5 @@ def iter_batches(model,
         if batch is None:
             break
         else:
-            feed_dict = {}
-            for idx, key in enumerate(tensorflow_placeholders):
-                feed_dict[key] = batch[idx]
-            yield feed_dict
+            yield {key: batch[idx] for idx, key in enumerate(tensorflow_placeholders)}
         del batch

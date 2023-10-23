@@ -28,14 +28,13 @@ def produce_window_dataset(path, window_size, out):
             if len(current_group) > 0:
                 groups.append(current_group)
                 current_group = []
+        elif len(current_group) == 0:
+            current_group.append(line_location)
+        elif abs(current_group[-1] - line_location) <= window_size:
+            current_group.append(line_location)
         else:
-            if len(current_group) == 0:
-                current_group.append(line_location)
-            elif abs(current_group[-1] - line_location) <= window_size:
-                current_group.append(line_location)
-            else:
-                groups.append(current_group)
-                current_group = [line_location]
+            groups.append(current_group)
+            current_group = [line_location]
     if len(current_group) > 0:
         groups.append(current_group)
 
@@ -43,18 +42,17 @@ def produce_window_dataset(path, window_size, out):
     EMPTY = ""
 
     with h5py.File(out, "w") as handle:
-        datasets = []
-        for col in range(num_columns):
-            datasets.append(
-                handle.create_dataset(
-                    str(col),
-                    (num_examples,),
-                    dtype=h5py.special_dtype(vlen=str),
-                    chunks=(1500,)
-                    # compression="gzip",
-                    # compression_opts=9
-                )
+        datasets = [
+            handle.create_dataset(
+                str(col),
+                (num_examples,),
+                dtype=h5py.special_dtype(vlen=str),
+                chunks=(1500,)
+                # compression="gzip",
+                # compression_opts=9
             )
+            for col in range(num_columns)
+        ]
         k = 0
         with open(path, "rt") as fin:
             current_location = 0
@@ -81,13 +79,22 @@ def produce_window_dataset(path, window_size, out):
                     if line == "\n":
                         start_delay = idx
                 start += start_delay
-                early_end = window_size
-                for idx, line in enumerate(current_lines[group[-1] - current_location:end - current_location]):
-                    if line == "\n":
-                        early_end = idx
-                        break
+                early_end = next(
+                    (
+                        idx
+                        for idx, line in enumerate(
+                            current_lines[
+                                group[-1]
+                                - current_location : end
+                                - current_location
+                            ]
+                        )
+                        if line == "\n"
+                    ),
+                    window_size,
+                )
                 end = group[-1] + early_end
-                cols = [[] for i in range(num_columns)]
+                cols = [[] for _ in range(num_columns)]
                 for line in current_lines[start - current_location:end - current_location]:
                     vals = line.rstrip().split("\t")
                     for col_index in range(num_columns):
@@ -138,7 +145,7 @@ def main():
                          " be larger than total_size (%d)" % (
             args.validation_start + args.validation_size, args.total_size
         ))
-    train_temp = args.out_train + ".train_temp"
+    train_temp = f"{args.out_train}.train_temp"
     try:
         file_slice(
             args.path,
@@ -154,18 +161,18 @@ def main():
             train_temp,
             append=True
         )
-        print("created temp file %s" % (train_temp))
+        print(f"created temp file {train_temp}")
         produce_window_dataset(
             train_temp, args.window_size, args.out_train
         )
         print("created windowed dataset for train")
     finally:
-        print("removing temp file %s" % (train_temp))
+        print(f"removing temp file {train_temp}")
         remove(train_temp)
 
 
     try:
-        validation_temp = args.out_validation + ".validation_temp"
+        validation_temp = f"{args.out_validation}.validation_temp"
         file_slice(
             args.path,
             args.validation_start,
@@ -173,11 +180,11 @@ def main():
             validation_temp,
             append=False
         )
-        print("created temp file %s" % (validation_temp))
+        print(f"created temp file {validation_temp}")
         produce_window_dataset(validation_temp, args.window_size, args.out_validation)
         print("created windowed dataset for validation")
     finally:
-        print("removing temp file %s" % (validation_temp))
+        print(f"removing temp file {validation_temp}")
         remove(validation_temp)
 
 

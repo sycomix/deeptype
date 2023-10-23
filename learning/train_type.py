@@ -102,9 +102,7 @@ def sparse_softmax_cross_entropy_with_logits(logits, labels):
 
 
 def concat(values, axis, name=None):
-    if len(values) == 1:
-        return values[0]
-    return tf.concat(values, axis, name=name)
+    return values[0] if len(values) == 1 else tf.concat(values, axis, name=name)
 
 
 def concat_tensor_array(values, name=None):
@@ -245,7 +243,7 @@ def save_session(session, saver, path, verbose=False):
     """
     makedirs(path, exist_ok=True)
     if not path.endswith("/"):
-        path = path + "/"
+        path = f"{path}/"
 
     path = join(path, "model.ckpt")
     if verbose:
@@ -467,8 +465,8 @@ def estimate_cudnn_parameter_size(num_layers,
     num_directions = direction_to_num_directions(direction)
     params = 0
     isize = input_size
-    for layer in range(num_layers):
-        for direction in range(num_directions):
+    for _ in range(num_layers):
+        for _ in range(num_directions):
             params += cudnn_lstm_parameter_size(
                 isize, hidden_size
             )
@@ -567,12 +565,11 @@ def decompose_layer_params(params, num_layers,
         raise ValueError("Only input_mode == linear_input supported for now.")
     num_directions = direction_to_num_directions(direction)
     offset = 0
-    all_weights = [[[] for j in range(num_directions)]
-                   for i in range(num_layers)]
+    all_weights = [[[] for _ in range(num_directions)] for _ in range(num_layers)]
     isize = cell_input_size
     with tf.variable_scope("DecomposeCudnnParams"):
         for layer in range(num_layers):
-            with tf.variable_scope("Layer{}".format(layer)):
+            with tf.variable_scope(f"Layer{layer}"):
                 for direction in range(num_directions):
                     with tf.variable_scope("fwd" if direction == 0 else "bwd"):
                         with tf.variable_scope("weights"):
@@ -586,7 +583,7 @@ def decompose_layer_params(params, num_layers,
             isize = hidden_size * num_directions
         isize = cell_input_size
         for layer in range(num_layers):
-            with tf.variable_scope("Layer{}".format(layer)):
+            with tf.variable_scope(f"Layer{layer}"):
                 for direction in range(num_directions):
                     with tf.variable_scope("fwd" if direction == 0 else "bwd"):
                         with tf.variable_scope("biases"):
@@ -1262,19 +1259,15 @@ def build_loss(inputs, objectives, labels, labels_mask,
                         tf.reshape(objective_class_weights, [-1]),
                         objective_labels +
                         tf.reshape(tf.range(len(objectives)) * max_output_vocab, [1, 1, len(objectives)]))
+                masked_weighed_negative_log_likelihood_sum = masked_negative_log_likelihood * class_weights_mask
                 if class_weights_normalize:
-                    masked_weighed_negative_log_likelihood_sum = masked_negative_log_likelihood * class_weights_mask
                     num_predictions = tf.maximum(tf.reduce_sum(labels_mask_casted * class_weights_mask), 1e-6)
-                    normed_loss = masked_weighed_negative_log_likelihood_sum / (num_predictions / len(objectives))
                 else:
-                    masked_weighed_negative_log_likelihood_sum = masked_negative_log_likelihood * class_weights_mask
                     num_predictions = tf.maximum(tf.reduce_sum(labels_mask_casted), 1e-6)
-                    normed_loss = masked_weighed_negative_log_likelihood_sum / (num_predictions / len(objectives))
             else:
                 masked_weighed_negative_log_likelihood_sum = masked_negative_log_likelihood
                 num_predictions = tf.maximum(tf.reduce_sum(labels_mask_casted), 1e-6)
-                normed_loss = masked_weighed_negative_log_likelihood_sum / (num_predictions / len(objectives))
-
+            normed_loss = masked_weighed_negative_log_likelihood_sum / (num_predictions / len(objectives))
             masked_negative_log_likelihood_sum = tf.reduce_sum(masked_negative_log_likelihood)
             losses.append(normed_loss)
             negative_log_likelihoods.append(masked_negative_log_likelihood_sum)
@@ -1358,16 +1351,13 @@ def build_loss(inputs, objectives, labels, labels_mask,
 
                         if class_weights_normalize:
                             num_predictions = tf.maximum(tf.reduce_sum(labels_mask_casted * class_weights_mask), 1e-6)
-                            normed_loss = masked_weighed_negative_log_likelihood_sum / num_predictions
                         else:
                             num_predictions = tf.maximum(tf.reduce_sum(labels_mask_casted), 1e-6)
-                            normed_loss = masked_weighed_negative_log_likelihood_sum / num_predictions
                     else:
                         masked_weighed_negative_log_likelihood_sum = masked_negative_log_likelihood
                         masked_negative_log_likelihood_sum = tf.reduce_sum(masked_negative_log_likelihood)
                         num_predictions = tf.maximum(tf.reduce_sum(labels_mask_casted), 1e-6)
-                        normed_loss = masked_weighed_negative_log_likelihood_sum / num_predictions
-
+                    normed_loss = masked_weighed_negative_log_likelihood_sum / num_predictions
                     losses.append(normed_loss)
                     negative_log_likelihoods.append(masked_negative_log_likelihood_sum)
 
@@ -1517,7 +1507,7 @@ def restore_session(session,
     """
     makedirs(path, exist_ok=True)
     if not path.endswith("/"):
-        path = path + "/"
+        path = f"{path}/"
     checkpoint = tf.train.get_checkpoint_state(path)
     if verbose:
         print("Looking for saved session under %r" % (path,), flush=True)
@@ -1530,34 +1520,34 @@ def restore_session(session,
         print("Restoring saved session from %r" % (join(path, fname),), flush=True)
 
     if use_metagraph:
-        param_saver = tf.train.import_meta_graph(join(path, fname + ".meta"),
-            clear_devices=True)
+        param_saver = tf.train.import_meta_graph(
+            join(path, f"{fname}.meta"), clear_devices=True
+        )
         missing_vars = []
+    elif only_features:
+        whitelist = ["embedding", "/RNN/", "/RNNParams", "CharacterConvolution", "HighwayLayer"]
+        to_restore = {
+            var.name[:-2]: var
+            for var in tf.global_variables()
+            if any(keyword in var.name for keyword in whitelist)
+        }
+        param_saver = tf.train.Saver(to_restore)
+    elif replace_to is None or replace_from is None:
+        reader = tf.train.NewCheckpointReader(join(path, fname))
+        saved_shapes = reader.get_variable_to_shape_map()
+        found_vars = [var for var in tf.global_variables()
+                      if var.name.split(':')[0] in saved_shapes]
+        missing_vars = [var for var in tf.global_variables()
+                        if var.name.split(':')[0] not in saved_shapes]
+        param_saver = tf.train.Saver(found_vars)
     else:
-        if only_features:
-            to_restore = {}
-            whitelist = ["embedding", "/RNN/", "/RNNParams", "CharacterConvolution", "HighwayLayer"]
-            for var in tf.global_variables():
-                if any(keyword in var.name for keyword in whitelist):
-                    to_restore[var.name[:-2]] = var
-            param_saver = tf.train.Saver(to_restore)
-        else:
-            if replace_to is not None and replace_from is not None:
-                to_restore = {}
-                for var in tf.global_variables():
-                    var_name = var.name[:var.name.rfind(":")]
-                    old_name = var_name.replace(replace_to, replace_from)
-                    to_restore[old_name] = var
-                param_saver = tf.train.Saver(to_restore)
-                missing_vars = []
-            else:
-                reader = tf.train.NewCheckpointReader(join(path, fname))
-                saved_shapes = reader.get_variable_to_shape_map()
-                found_vars = [var for var in tf.global_variables()
-                              if var.name.split(':')[0] in saved_shapes]
-                missing_vars = [var for var in tf.global_variables()
-                                if var.name.split(':')[0] not in saved_shapes]
-                param_saver = tf.train.Saver(found_vars)
+        to_restore = {}
+        for var in tf.global_variables():
+            var_name = var.name[:var.name.rfind(":")]
+            old_name = var_name.replace(replace_to, replace_from)
+            to_restore[old_name] = var
+        param_saver = tf.train.Saver(to_restore)
+        missing_vars = []
     param_saver.restore(session, join(path, fname))
     session.run([var.initializer for var in missing_vars])
     return True
@@ -1573,11 +1563,7 @@ def bidirectional_dynamic_rnn(cell, inputs, dtype, time_major=True, swap_memory=
             swap_memory=swap_memory
         )
 
-    if time_major:
-        reverse_axis = 0
-    else:
-        reverse_axis = 1
-
+    reverse_axis = 0 if time_major else 1
     with tf.variable_scope("backward"):
         out_bwd, final_bwd = tf.nn.dynamic_rnn(
             cell,
@@ -1593,17 +1579,15 @@ def bidirectional_dynamic_rnn(cell, inputs, dtype, time_major=True, swap_memory=
 
 def get_embedding_lookup(size, dim, dtype, reuse=None, trainable=True):
     with tf.variable_scope(tf.get_variable_scope(), reuse=reuse):
-        W = tf.get_variable(
+        return tf.get_variable(
             name="embedding",
             shape=[size, dim],
             dtype=dtype,
             initializer=tf.random_uniform_initializer(
-                -1.0 / math.sqrt(dim),
-                1.0 / math.sqrt(dim)
+                -1.0 / math.sqrt(dim), 1.0 / math.sqrt(dim)
             ),
-            trainable=trainable
+            trainable=trainable,
         )
-        return W
 
 
 def embedding_lookup(inputs,
@@ -1640,18 +1624,17 @@ def embedding_lookup(inputs,
         tf.Tensor, result of tf.nn.embedding_lookup(LookupTable, inputs)
     """
     W = get_embedding_lookup(size, dim, dtype, reuse, trainable=trainable)
-    if mask_negative:
-        embedded = tf.nn.embedding_lookup(W, tf.maximum(inputs, 0))
-        null_mask = tf.expand_dims(
-            tf.cast(
-                tf.not_equal(inputs, -1),
-                dtype
-            ),
-            -1
-        )
-        return embedded * null_mask
-    else:
+    if not mask_negative:
         return tf.nn.embedding_lookup(W, inputs)
+    embedded = tf.nn.embedding_lookup(W, tf.maximum(inputs, 0))
+    null_mask = tf.expand_dims(
+        tf.cast(
+            tf.not_equal(inputs, -1),
+            dtype
+        ),
+        -1
+    )
+    return embedded * null_mask
 
 
 def _get_sharded_variable(name, shape, dtype, num_shards):
@@ -1683,8 +1666,8 @@ def _get_concat_variable(name, shape, dtype, num_shards):
     if len(sharded_variable) == 1:
         return sharded_variable[0]
 
-    concat_name = name + "/concat"
-    concat_full_name = tf.get_variable_scope().name + "/" + concat_name + ":0"
+    concat_name = f"{name}/concat"
+    concat_full_name = f"{tf.get_variable_scope().name}/{concat_name}:0"
     for value in tf.get_collection(tf.GraphKeys.CONCATENATED_VARIABLES):
         if value.name == concat_full_name:
             return value
@@ -1814,7 +1797,8 @@ class SequenceModel(object):
         else:
             try:
                 self.global_step = tf.get_default_graph().get_tensor_by_name(
-                    self.name + "/" + "global_step:0")
+                    f"{self.name}/global_step:0"
+                )
             except KeyError:
                 self.global_step = tf.Variable(0, trainable=False, name="global_step")
             tf.add_to_collection(GLOBAL_STEP, self.global_step)
@@ -1873,27 +1857,30 @@ class SequenceModel(object):
         outputs, outputs_probs = session.run(
             (self.decoded, self.decoded_scores), feed_dict
         )
-        predictions_out = {}
-        for value, val_prob, objective in zip(outputs, outputs_probs, self.objectives):
-            predictions_out[objective["name"]] = (value, val_prob)
-        return predictions_out
+        return {
+            objective["name"]: (value, val_prob)
+            for value, val_prob, objective in zip(
+                outputs, outputs_probs, self.objectives
+            )
+        }
 
     def predict_proba(self, session, feed_dict):
         feed_dict[self.is_training] = False
         outputs = session.run(
             self.unary_scores, feed_dict
         )
-        predictions_out = {}
-        for value, objective in zip(outputs, self.objectives):
-            predictions_out[objective["name"]] = value
-        return predictions_out
+        return {
+            objective["name"]: value
+            for value, objective in zip(outputs, self.objectives)
+        }
 
     def save(self, session, path):
         makedirs(path, exist_ok=True)
         with open(join(path, "model.json"), "wt") as fout:
-            save_dict = {}
-            for field in type(self).fields_to_save():
-                save_dict[field] = getattr(self, field)
+            save_dict = {
+                field: getattr(self, field)
+                for field in type(self).fields_to_save()
+            }
             json.dump(save_dict, fout)
 
         with open(join(path, "rng.pkl"), "wb") as fout:
@@ -1916,12 +1903,11 @@ class SequenceModel(object):
                 if field in ex_fields:
                     model_props[field] = getattr(args, field)
 
-        # prune old fields based on changes to saveable fields:
-        relevant_props = {}
-        for field in cls.fields_to_save():
-            if field in model_props:
-                relevant_props[field] = model_props[field]
-
+        relevant_props = {
+            field: model_props[field]
+            for field in cls.fields_to_save()
+            if field in model_props
+        }
         relevant_props["trainable"] = trainable
         relevant_props["faux_cudnn"] = faux_cudnn
 
@@ -1998,7 +1984,7 @@ class Config(object):
         all_examples = {}
         for dataset in paths:
             _, extension = splitext(dataset["path"])
-            if extension == ".h5" or extension == ".hdf5":
+            if extension in [".h5", ".hdf5"]:
                 if self.classifications is None:
                     if self.wikidata_path is None or self.classification_path is None:
                         raise ValueError("missing wikidata_path and "
@@ -2035,14 +2021,12 @@ class Config(object):
 
     def load_dataset(self, dataset_type, merge=True):
         datasets = self.load_dataset_separate(dataset_type)
-        if merge:
-            return CombinedDataset(list(datasets.values()))
-        return datasets
+        return CombinedDataset(list(datasets.values())) if merge else datasets
 
 
 def boolean_argument(parser, name, default):
-    parser.add_argument("--" + name, action="store_true", default=default)
-    parser.add_argument("--no" + name, action="store_false", dest=name)
+    parser.add_argument(f"--{name}", action="store_true", default=default)
+    parser.add_argument(f"--no{name}", action="store_false", dest=name)
 
 
 def parse_args(args=None):
@@ -2124,7 +2108,7 @@ def merge_all_metrics(metrics):
     for key, metric in metrics.items():
         for subkey, submetric in metric.items():
             if len(key) > 0:
-                out[key + "_" + subkey] = submetric
+                out[f"{key}_{subkey}"] = submetric
                 if subkey not in out:
                     out[subkey] = submetric
                 else:
@@ -2138,11 +2122,10 @@ def log_outcome(logger, outcome, step, name):
     for k, v in sorted(outcome.items()):
         if "total" in k:
             continue
-        else:
-            total = outcome[k + "_total"]
-            if total == 0:
-                continue
-            logger.log(k, v / total, step=step)
+        total = outcome[f"{k}_total"]
+        if total == 0:
+            continue
+        logger.log(k, v / total, step=step)
     logger.writer.flush()
 
 
@@ -2153,15 +2136,15 @@ def compute_f1(metrics, objectives, report_class_f1):
     total = 0
     for objective in objectives:
         name = objective["name"]
-        key = "%s_true_positives" % (name,)
+        key = f"{name}_true_positives"
         if key not in metrics:
             continue
         tp = metrics[key]
-        fp = metrics["%s_false_positives" % (name,)]
-        fn = metrics["%s_false_negatives" % (name,)]
+        fp = metrics[f"{name}_false_positives"]
+        fn = metrics[f"{name}_false_negatives"]
         del metrics[key]
-        del metrics["%s_false_positives" % (name,)]
-        del metrics["%s_false_negatives" % (name,)]
+        del metrics[f"{name}_false_positives"]
+        del metrics[f"{name}_false_negatives"]
 
 
 

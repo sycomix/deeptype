@@ -11,7 +11,7 @@ from wikidata_linker_utils.logic import logical_negate, logical_ors, logical_and
 import wikidata_linker_utils.wikidata_properties as wprop
 
 def wkp(c, name):
-    return c.article2id['enwiki/' + name][0][0]
+    return c.article2id[f'enwiki/{name}'][0][0]
 
 def wkd(c, name):
     return c.name2index[name]

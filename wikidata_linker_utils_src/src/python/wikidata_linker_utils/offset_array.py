@@ -40,18 +40,18 @@ class OffsetArray(object):
 
     @classmethod
     def load(cls, path, compress=True):
-        values = np.load(path + "_values.npy")
-        if exists(path + "_offsets.sparse.npy"):
-            offsets_compressed = np.load(path + "_offsets.sparse.npy")
+        values = np.load(f"{path}_values.npy")
+        if exists(f"{path}_offsets.sparse.npy"):
+            offsets_compressed = np.load(f"{path}_offsets.sparse.npy")
             offsets = make_dense(offsets_compressed, cumsum=True)
         else:
             # legacy mode, load dense versions:
-            offsets = np.load(path + "_offsets.npy")
+            offsets = np.load(f"{path}_offsets.npy")
             if compress:
                 if should_compress(offsets):
                     offsets_compressed = make_sparse(offsets)
-                    np.save(path + "_offsets.sparse.npy", offsets_compressed)
-            # optionally delete the old version here
+                    np.save(f"{path}_offsets.sparse.npy", offsets_compressed)
+                # optionally delete the old version here
         return OffsetArray(
             values,
             offsets
@@ -79,12 +79,12 @@ def save_record_with_offset(path, index2indices, total_size=None):
         values, offsets = convert_dict_to_offset_array(index2indices, total_size)
     else:
         values, offsets = convert_to_offset_array(index2indices)
-    np.save(path + "_values.npy", values)
+    np.save(f"{path}_values.npy", values)
     if should_compress(offsets):
         compressed_offsets = make_sparse(offsets)
-        np.save(path + "_offsets.sparse.npy", compressed_offsets)
+        np.save(f"{path}_offsets.sparse.npy", compressed_offsets)
     else:
-        np.save(path + "_offsets.npy", offsets)
+        np.save(f"{path}_offsets.npy", offsets)
 
 
 def load_sparse(path):
@@ -118,5 +118,5 @@ class SparseAttribute(object):
 
     @classmethod
     def load(cls, path):
-        dense, mask = load_sparse(path + "_values.sparse.npy")
+        dense, mask = load_sparse(f"{path}_values.sparse.npy")
         return SparseAttribute(dense, mask)

@@ -8,10 +8,10 @@ adaptive_eta = progressbar.AdaptiveETA()
 
 class MessageProgressbar(progressbar.ProgressBar):
     def set_message(self, message):
-        self.widgets[0] = message + " "
+        self.widgets[0] = f"{message} "
 
     def set_item(self, item):
-        self.widgets[4] = " %s) " % (item,)
+        self.widgets[4] = f" {item}) "
 
 
 def get_progress_bar(message, max_value=None, item="lines"):
@@ -31,12 +31,12 @@ def get_progress_bar(message, max_value=None, item="lines"):
             iteration stats.
     """
     widgets = [
-        message + " ",
+        f"{message} ",
         percentage,
         " (",
         counter,
-        " %s) " % (item,),
+        f" {item}) ",
         bar,
-        adaptive_eta
+        adaptive_eta,
     ]
     return MessageProgressbar(widgets=widgets, maxval=max_value)

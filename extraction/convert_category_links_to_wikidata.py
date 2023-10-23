@@ -30,7 +30,7 @@ def main():
     missing = []
     num_missing = 0
     num_broken = 0
-    all_category_links = [[] for i in range(num_ids)]
+    all_category_links = [[] for _ in range(num_ids)]
     with open(args.category_links, 'rt') as fin:
         fin_pbar = get_progress_bar('reading category_links', max_value=num_lines)(fin)
         for line in fin_pbar:
@@ -42,13 +42,13 @@ def main():
             if len(dest) == 0:
                 num_broken += 1
                 continue
-            origin = args.prefix + '/' + origin
-            prefixed_dest = args.prefix + '/' + dest
+            origin = f'{args.prefix}/{origin}'
+            prefixed_dest = f'{args.prefix}/{dest}'
             origin_index = trie.get(origin, None)
             dest_index = trie.get(prefixed_dest, None)
 
             if dest_index is None:
-                prefixed_dest = args.prefix + '/' + dest[0].upper() + dest[1:]
+                prefixed_dest = f'{args.prefix}/{dest[0].upper()}{dest[1:]}'
                 dest_index = trie.get(prefixed_dest, None)
 
             if origin_index is None or dest_index is None:
@@ -63,8 +63,8 @@ def main():
     for origin, dest in missing[:10]:
         print("%r -> %r" % (origin, dest))
     save_record_with_offset(
-        join(args.out, "wikidata_%s_category_links" % (args.prefix,)),
-        all_category_links
+        join(args.out, f"wikidata_{args.prefix}_category_links"),
+        all_category_links,
     )
 
 

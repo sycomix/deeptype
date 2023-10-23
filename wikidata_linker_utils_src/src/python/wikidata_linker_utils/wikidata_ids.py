@@ -11,10 +11,7 @@ class MarisaAsDict(object):
 
     def get(self, key, fallback):
         value = self.marisa.get(key, None)
-        if value is None:
-            return fallback
-        else:
-            return value[0][0]
+        return fallback if value is None else value[0][0]
 
     def __getitem__(self, key):
         value = self.marisa[key]
@@ -32,8 +29,6 @@ def load_wikidata_ids(path, verbose=True):
         if verbose:
             print("loading wikidata id -> index")
         name2index = MarisaAsDict(marisa_trie.RecordTrie('i').load(wikidata_ids_inverted_path))
-        if verbose:
-            print("done")
     else:
         if verbose:
             print("building trie")
@@ -42,15 +37,15 @@ def load_wikidata_ids(path, verbose=True):
             marisa_trie.RecordTrie('i', [(name, (k,)) for k, name in enumerate(ids)])
         )
         name2index.marisa.save(wikidata_ids_inverted_path)
-        if verbose:
-            print("done")
+    if verbose:
+        print("done")
     return (ids, name2index)
 
 
 def load_names(path, num, prefix):
     names = {}
-    errors = 0  # debug
     if num > 0:
+        errors = 0  # debug
         with open(path, "rt", encoding="UTF-8") as fin:
             for line in fin:
                 try:
@@ -60,9 +55,8 @@ def load_names(path, num, prefix):
                 number = int(number)
                 if number >= num:
                     break
-                else:
-                    if name.startswith(prefix):
-                        names[number] = name[7:]
+                if name.startswith(prefix):
+                    names[number] = name[7:]
         print(errors)  # debug
     return names
 
@@ -93,12 +87,12 @@ def saved_sparql_query(savename, query):
     if true_exists(savename):
         with open(savename, "rt") as fin:
             out = json.load(fin)
-        return out
     else:
         out = sparql_query(query)
         with open(savename, "wt") as fout:
             json.dump(out, fout)
-        return out
+
+    return out
 
 
 def property_names(prop_save_path):

@@ -11,7 +11,7 @@ import wikidata_linker_utils.wikidata_properties as wprop
 
 def wkp(c, name):
     """Convert a string wikipedia article name to its Wikidata index."""
-    return c.article2id["enwiki/" + name][0][0]
+    return c.article2id[f"enwiki/{name}"][0][0]
 
 
 def wkd(c, name):

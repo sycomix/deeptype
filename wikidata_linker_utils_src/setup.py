@@ -54,10 +54,12 @@ class clean(clean_module.clean):
                       join("src", "cython", WIKIDATA_LINKER_INTERNAL_MODULE_NAME, "*.c"),
                       join("src", "cython", WIKIDATA_LINKER_INTERNAL_MODULE_NAME, "*.cpp"),
                       join("src", "cython", WIKIDATA_LINKER_INTERNAL_MODULE_NAME, "*.so")]:
-            subprocess.Popen("rm -rf %s" % (place,),
-                             shell=True,
-                             executable="/bin/bash",
-                             cwd=SCRIPT_DIR)
+            subprocess.Popen(
+                f"rm -rf {place}",
+                shell=True,
+                executable="/bin/bash",
+                cwd=SCRIPT_DIR,
+            )
 
 compiler = distutils.ccompiler.new_compiler()
 distutils.sysconfig.customize_compiler(compiler)
@@ -70,7 +72,7 @@ for pyx_file in find_files_by_suffix(join(WIKIDATA_LINKER_SOURCE_DIR, "cython"),
     # pxd files are like header files for pyx files
     # and they can also have relevant includes.
     relevant_files = [pyx_file]
-    pxd_file = pyx_file[:-3] + "pxd"
+    pxd_file = f"{pyx_file[:-3]}pxd"
     if exists(pxd_file):
         relevant_files.append(pxd_file)
 
@@ -104,10 +106,11 @@ for file in find_files_by_suffix(join(WIKIDATA_LINKER_SOURCE_DIR, "python"), ".p
 
 def symlink_built_package(module_name, dest_directory):
     build_dir_contents = listdir(join(SCRIPT_DIR, "build"))
-    lib_dot_fnames = []
-    for name in build_dir_contents:
-        if name.startswith("lib."):
-            lib_dot_fnames.append(join(SCRIPT_DIR, "build", name))
+    lib_dot_fnames = [
+        join(SCRIPT_DIR, "build", name)
+        for name in build_dir_contents
+        if name.startswith("lib.")
+    ]
     # get latest lib. file created and symlink it to the project
     # directory for easier testing
     lib_dot_fnames = sorted(

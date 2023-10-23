@@ -201,7 +201,7 @@ def build_truth_tables(collection, lines, qids, relation_name):
     kept_qids = []
     kept_dims = []
     for i, (qid, qid_sum) in enumerate(zip(qids, qid_sums)):
-        if qid_sum != 0 and qid_sum != truth_tables.shape[0]:
+        if qid_sum not in [0, truth_tables.shape[0]]:
             kept_qids.append(qid)
             kept_dims.append(i)
     truth_tables = truth_tables[:, kept_dims]
@@ -277,18 +277,18 @@ def main():
             window_size=args.window_size,
             max_vocab_size=args.max_vocab_size,
             verbose=True)
-        for qid, auc, average_precision_score, correct, pos, neg in field_auc_scores:
-            report.append(
-                {
-                    "qid": collection.ids[qid],
-                    "auc": auc,
-                    "average_precision_score": average_precision_score,
-                    "correct": correct,
-                    "relation": relation_name,
-                    "positive": pos,
-                    "negative": neg
-                }
-            )
+        report.extend(
+            {
+                "qid": collection.ids[qid],
+                "auc": auc,
+                "average_precision_score": average_precision_score,
+                "correct": correct,
+                "relation": relation_name,
+                "positive": pos,
+                "negative": neg,
+            }
+            for qid, auc, average_precision_score, correct, pos, neg in field_auc_scores
+        )
         with open(args.out, "wt") as fout:
             json.dump(report, fout)
         t1 = time.time()

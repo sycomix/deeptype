@@ -151,7 +151,7 @@ def parse_args(argv=None):
         help="File where category link information should be saved (tsv).")
 
     def add_int_arg(name, default):
-        parser.add_argument("--%s" % (name,), type=int, default=default)
+        parser.add_argument(f"--{name}", type=int, default=default)
 
     add_int_arg("threads", 8)
     add_int_arg("max_jobs", 10000)

@@ -27,13 +27,11 @@ def get_bash_result(command):
                                stdout=subprocess.PIPE,
                                stderr=subprocess.STDOUT,
                                universal_newlines=True)
-    out = [line for line in process.stdout]
+    out = list(process.stdout)
     process.wait()
     assert process.returncode == 0
     return out
 
 
 def count_lines(path):
-    return int(
-        get_bash_result('wc -l %s' % (path,))[0].strip().split(' ')[0]
-    )
+    return int(get_bash_result(f'wc -l {path}')[0].strip().split(' ')[0])

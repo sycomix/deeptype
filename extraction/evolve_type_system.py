@@ -51,7 +51,7 @@ def load_aucs():
                     aucs[key].append(report["auc"])
                 else:
                     aucs[key] = [report["auc"]]
-    for key in aucs.keys():
+    for key in aucs:
         aucs[key] = np.mean(aucs[key])
     return aucs
 
@@ -135,10 +135,7 @@ def get_cached_satisfy(collection, aucs, ids, mmap=False):
             del cached_satisfy
             cached_satisfy = np.load(path, mmap_mode="r")
     else:
-        if mmap:
-            cached_satisfy = np.load(path, mmap_mode="r")
-        else:
-            cached_satisfy = np.load(path)
+        cached_satisfy = np.load(path, mmap_mode="r") if mmap else np.load(path)
     return cached_satisfy
 
 
@@ -178,19 +175,31 @@ def main():
                                    collection,
                                    config.sample_size)
     aucs = load_aucs()
-    ids = sorted(set([idx for doc_tags in test_tags
-                      for _, tag in doc_tags if tag is not None
-                      for idx in tag[2] if len(tag[2]) > 1]))
+    ids = sorted(
+        {
+            idx
+            for doc_tags in test_tags
+            for _, tag in doc_tags
+            if tag is not None
+            for idx in tag[2]
+            if len(tag[2]) > 1
+        }
+    )
     id2pos = {idx: k for k, idx in enumerate(ids)}
     # use reduced identity system:
     remapped_tags = []
     for doc_tags in test_tags:
-        for text, tag in doc_tags:
-            if tag is not None:
-                remapped_tags.append(
-                    (id2pos[tag[1]] if len(tag[2]) > 1 else tag[1],
-                     np.array([id2pos[idx] for idx in tag[2]]) if len(tag[2]) > 1 else tag[2],
-                     tag[3]))
+        remapped_tags.extend(
+            (
+                id2pos[tag[1]] if len(tag[2]) > 1 else tag[1],
+                np.array([id2pos[idx] for idx in tag[2]])
+                if len(tag[2]) > 1
+                else tag[2],
+                tag[3],
+            )
+            for text, tag in doc_tags
+            if tag is not None
+        )
     test_tags = remapped_tags
 
     aucs = {key: value for key, value in aucs.items() if value > 0.5}

@@ -96,10 +96,7 @@ def get_wikidata_mapping(name2id_path,
                 if verbose:
                     t_now = time.time()
                     new_speed = (seen - seen_last) / (t_now - t_then)
-                    if speed is None:
-                        speed = new_speed
-                    else:
-                        speed = 0.9 * speed + 0.1 * new_speed
+                    speed = new_speed if speed is None else 0.9 * speed + 0.1 * new_speed
                     clear_output(wait=True)
                     print("%.3f%% done (%d seen, %.3f docs/s, ETA: %ds)" % (
                         100.0 * seen / approx_max_quantity,
@@ -109,9 +106,8 @@ def get_wikidata_mapping(name2id_path,
                     ), flush=True)
                     seen_last = seen
                     t_then = t_now
-                else:
-                    if seen < approx_max_quantity:
-                        pbar.update(seen)
+                elif seen < approx_max_quantity:
+                    pbar.update(seen)
             if fout_name2id is not None:
                 if "sitelinks" in doc:
                     for key, value in doc["sitelinks"].items():
@@ -132,7 +128,7 @@ def get_wikidata_mapping(name2id_path,
         if pbar is not None:
             pbar.finish()
     finally:
-        for name, (outfile, _) in relations.items():
+        for outfile, _ in relations.values():
             outfile.close()
         if fout_name2id is not None:
             fout_name2id.close()
@@ -177,21 +173,19 @@ def fixed_point_name_alternates(name):
         return (name, name[:-2] + "is")
     if name.endswith("ies"):
         return (name, name[:-3] + "y")
-    if name.endswith("s"):
-        return (name, name[:-1])
-    return (name,)
+    return (name, name[:-1]) if name.endswith("s") else (name, )
 
 
 def build_fixed_point(out, prefix):
-    wiki_fixed_point_save = join(out, "wikidata_%s_fixed_points_values.npy" % (prefix,))
+    wiki_fixed_point_save = join(out, f"wikidata_{prefix}_fixed_points_values.npy")
     if not true_exists(wiki_fixed_point_save):
-        print("building %s fixed point property." % (prefix,))
+        print(f"building {prefix} fixed point property.")
         trie = marisa_trie.RecordTrie('i').load(join(out, WIKITILE_2_WIKIDATA_TRIE_NAME))
         num_items = count_lines(join(out, WIKIDATA_IDS_NAME))
         fixed_point_relation = {}
 
-        category_prefix = "%s/Category:" % (prefix,)
-        article_prefix = "%s/" % (prefix,)
+        category_prefix = f"{prefix}/Category:"
+        article_prefix = f"{prefix}/"
         wikititle2wikidata_path = join(out, WIKITILE_2_WIKIDATA_TSV_NAME)
         relevant_items = trie.iteritems(category_prefix)
 
@@ -204,9 +198,9 @@ def build_fixed_point(out, prefix):
                     break
         print("Found %d fixed point relations for %s" % (len(fixed_point_relation), prefix,))
         save_record_with_offset(
-            join(out, "wikidata_%s_fixed_points" % (prefix,)),
+            join(out, f"wikidata_{prefix}_fixed_points"),
             fixed_point_relation,
-            num_items
+            num_items,
         )
 
 
@@ -260,7 +254,11 @@ def main():
         wikidata_properties.END_TIME
     ]
     wikidata_important_properties_fnames = [
-        (name, join(args.wikidata, "wikidata_%s.txt" % (name,)), name in wikidata_names2temporal_prop_names)
+        (
+            name,
+            join(args.wikidata, f"wikidata_{name}.txt"),
+            name in wikidata_names2temporal_prop_names,
+        )
         for name in wikidata_important_properties
     ]
 
@@ -287,14 +285,11 @@ def main():
             missing_wikidata_important_properties_fnames
         )
 
-    numpy_wikidata_important_properties_fnames = [
+    if numpy_wikidata_important_properties_fnames := [
         (name, outfile, is_temporal)
         for name, outfile, is_temporal in wikidata_important_properties_fnames
-        if not values_exist(join(args.wikidata, "wikidata_%s" % (name,)))
-    ]
-
-    # obtain a mapping from id -> number
-    if len(numpy_wikidata_important_properties_fnames) > 0:
+        if not values_exist(join(args.wikidata, f"wikidata_{name}"))
+    ]:
         _, id2index = load_wikidata_ids(args.wikidata)
         # make relations numerical:
         for relname, outfile, is_temporal in numpy_wikidata_important_properties_fnames:
@@ -315,15 +310,12 @@ def main():
                             break
                 value[0] = len(lines)
                 value = value[:position]
-                np.save(join(args.wikidata, "wikidata_%s_values.sparse.npy" % (relname,)), value)
+                np.save(join(args.wikidata, f"wikidata_{relname}_values.sparse.npy"), value)
             else:
                 relation = [
                     line2indices(id2index, line) for line in fin_pbar
                 ]
-                save_record_with_offset(
-                    join(args.wikidata, "wikidata_%s" % (relname,)),
-                    relation
-                )
+                save_record_with_offset(join(args.wikidata, f"wikidata_{relname}"), relation)
         del id2index
 
     # convert the mapping from wikinames to integer values:

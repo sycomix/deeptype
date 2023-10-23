@@ -187,9 +187,7 @@ def annotate_document(doc,
         )
 
     if current_position != len(doc):
-        out.append(
-            (doc[current_position:len(doc)], None)
-        )
+        out.append((doc[current_position:], None))
     return out
 
 

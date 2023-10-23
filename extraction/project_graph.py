@@ -92,17 +92,13 @@ def main():
         language_path=args.language_path,
         cache=args.use_cache
     )
-    if args.interactive:
-        alert_failure = enter_or_quit
-    else:
-        alert_failure = lambda: sys.exit(1)
-
+    alert_failure = enter_or_quit if args.interactive else (lambda: sys.exit(1))
     while True:
         try:
             collection.load_blacklist(join(SCRIPT_DIR, "blacklist.json"))
-        except (ValueError,) as e:
+        except ValueError as e:
             print("Issue reading blacklist, please fix.")
-            print(str(e))
+            print(e)
             alert_failure()
             continue
 
@@ -113,7 +109,7 @@ def main():
                     classifier = reload_module(classifier_fname)
                 except ALLOWED_IMPORT_ERRORS as e:
                     print("issue reading %r, please fix." % (classifier_fname,))
-                    print(str(e))
+                    print(e)
                     traceback.print_exc(file=sys.stdout)
                     alert_failure()
                     continue
@@ -128,7 +124,7 @@ def main():
                     print("classification took %.3fs" % (t1 - t0,))
                 except ALLOWED_RUNTIME_ERRORS as e:
                     print("issue running %r, please fix." % (classifier_fname,))
-                    print(str(e))
+                    print(e)
                     traceback.print_exc(file=sys.stdout)
                     alert_failure()
                     continue
